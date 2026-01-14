@@ -1,0 +1,955 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>yigitozen.xyz</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Meshopt Decoder (Global) -->
+    <script src="https://unpkg.com/meshoptimizer@0.19.0/meshopt_decoder.js"></script>
+
+    <!-- FONTS -->
+    <style>
+        @font-face {
+            font-family: 'Telegrama Raw';
+            src: url('https://raw.githubusercontent.com/decentralize-dfw/font/main/telegrama_raw.otf') format('opentype');
+        }
+        @font-face {
+            font-family: 'Telegrama Render';
+            src: url('https://raw.githubusercontent.com/decentralize-dfw/font/main/telegrama_render_osn.otf') format('opentype');
+        }
+        @font-face {
+            font-family: 'GAU Private';
+            src: url('https://raw.githubusercontent.com/decentralize-dfw/font/main/GAU_private_R.TTF') format('truetype');
+        }
+
+        @font-face {
+            font-family: 'Robot';
+            src: url('https://raw.githubusercontent.com/decentralize-dfw/font/main/OwreKynge.ttf') format('truetype');
+        }
+
+        :root {
+            --ui-color: white;//#FF006A; 
+            --bg-color: #6c95ff;
+        }
+
+       html, body {
+            font-family: 'Telegrama Render', sans-serif;
+            background-color: var(--bg-color);
+            /* Arka plan resmi eklemek istersen buraya ekleyebilirsin */
+            /* background-image: url('...'); */
+            /* background-size: cover; */
+            color: var(--ui-color);
+            margin: 0;
+            overflow: hidden; /* Prevent scrolling */
+            width: 100vw;
+            height: 100vh;
+            touch-action: none; /* Critical for mobile: disables browser zoom/scroll handling */
+        }
+
+        #scene-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1;
+            touch-action: none;
+        }
+
+        /* HTML Elements in 3D */
+        .scene-html-element {
+            pointer-events: auto; /* Enable clicking on HTML */
+            user-select: none;
+            backface-visibility: hidden;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.8); /* Slight dark bg for readability */
+            border: 1px solid var(--ui-color);
+        }
+        
+        .scene-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        #loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color); z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            transition: opacity 0.5s ease-out;
+            pointer-events: none;
+        }
+        .loader-text {
+            font-family: 'Telegrama Raw', sans-serif;
+            font-size: 2rem; color: var(--ui-color);
+            animation: pulse 1s infinite;
+            text-align: center;
+            padding: 20px;
+        }
+        @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; } }
+
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="loader-text">INITIALIZING...</div>
+    </div>
+
+    <div id="scene-container"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { DragControls } from 'three/addons/controls/DragControls.js';
+        import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+        import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+
+        // --- 1. SCENE DATA ---
+        
+        const sceneObjects = [
+            {
+                type: 'image',
+                src: 'https://static.wixstatic.com/media/54a996_3668fa84a45f4d27b27d9db2a7f9058c~mv2.png',
+                width: 2500,
+                position: { x: 0, y: 0, z: -500 },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: 1000
+            },
+
+            // --- 3D MODEL ---   
+           
+            {
+                type: 'model',
+                src: 'https://github.com/decentralize-dfw/decentralize-archives/blob/main/decentralize-animation360.glb',
+                position: { x: -850, y: 200, z: 0 },
+                rotation: { x: 0, y: -45, z: 0 },
+                scale: 600
+            },
+
+            
+
+            // --- TEXT (WEBGL for Depth Sorting) ---
+            {
+                type: 'text',
+                content: 'socials:', 
+                fontSize: 65, 
+                color: 'white',
+                fontFamily: 'Telegrama Raw', 
+                position: { x: -850, y: 1000, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+            
+            
+             {
+                type: 'text',
+                content: 'Yigit Ozen', 
+                fontSize: 75, 
+                color: 'white',
+                fontFamily: 'Telegrama Raw', 
+                position: { x: -850, y: 100, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+
+            {
+                type: 'text',
+                content: 'decentralize*', 
+                fontSize: 75, 
+                color: 'white',
+                fontFamily: 'Telegrama Raw', 
+                position: { x: -850, y: -200, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+
+            {
+                type: 'text',
+                content: 'architect,artist,web designer,3d', 
+                fontSize: 65, 
+                color: 'white',
+                fontFamily: 'Telegrama Raw', 
+                position: { x: 450, y: 620, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+
+             {
+                type: 'text',
+                content: 'politecnico di milano m.arch\nbilgi uni. arch\nistanbul saint-joseph', 
+                fontSize: 55, 
+                color: 'white',
+                fontFamily: 'Telegrama Raw', 
+                position: { x: 600, y: 210, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+
+            {
+                type: 'text',
+                content: 'edu:', 
+                fontSize: 65, 
+                color: 'white',
+                fontFamily: 'Telegrama Raw', 
+                position: { x: -200, y: 210, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+ {
+                type: 'text',
+                content: 'work:', 
+                fontSize: 65, 
+                color: 'white',
+                fontFamily: 'Telegrama Raw', 
+                position: { x: -200, y: -200, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            }, 
+            {
+                type: 'text',
+                content: 'Özen is the founder of Decentralize Design, a forward-looking metaverse architecture and virtual design \nstudio operating at the intersection of architecture, fashion, art, and technology.His practice extends\n architectural thinking beyond physical construction into blockchain-based virtual environments, WebXR and \nThree.js–driven spatial interfaces, digital fashion systems, curatorial frameworks, and immersive virtual \ntheater formats. Neue² Dojo stands out as one of the studio’s key projects, a blockchain-enabled virtual art \ngallery conceived as both an exhibition space and an experimental cultural platform. Through \nde-centralize.com, Özen presents his personal work, project index, and studio-related information, \narticulating a practice that has been active since 2021. Collectively, all his past activity form a cohesive \necosystem that reflects Özen’s decentralized, future-oriented agenda, positioning architecture as an adaptive,\n programmable medium for shaping the emerging virtual worlds of tomorrow.', 
+                fontSize: 34, 
+                color: 'white',
+                fontFamily: 'Telegrama Raw', 
+                position: { x: 0, y: -630, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },             
+            
+{
+                type: 'text',
+                content: 'decentralize design, 2021\nneue2dojo gallery,2023\nvirtually ever after, 2025', 
+                fontSize: 55, 
+                color: 'white',
+                fontFamily: 'Telegrama Raw', 
+                position: { x: 600, y: -200, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 }
+            },
+            // --- NEW: LINK OBJECT EXAMPLE --- 
+            {
+                type: 'link',
+                src: 'https://img.icons8.com/?size=100&id=xLIkjgcmFOsC&format=png&color=000000', // İkon/Resim URL
+                link: 'mailto:info@de-centralize.com', // Yeni sekmede açılacak link
+                label: '', // Altındaki yazı
+                fontFamily: 'Telegrama Raw',
+                fontSize: 80,
+                color: '#FFFFFF',
+                width: 250, // Resmin genişliği
+               position: { x: 200, y: 1050, z: 0 }, // Konumu
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: .6
+            },
+             {
+                type: 'link',
+                src: 'https://img.icons8.com/?size=100&id=ByIxE00CgtDN&format=png&color=000000', // İkon/Resim URL
+                link: 'https://x.com/decentralize___', // Yeni sekmede açılacak link
+                label: '', // Altındaki yazı
+                fontFamily: 'Telegrama Raw',
+                fontSize: 80,
+                color: '#FFFFFF',
+                width: 250, // Resmin genişliği
+                position: { x: -200, y: 1050, z: 0 }, // Konumu
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: .6
+            },
+
+            {
+                type: 'link',
+                src: 'https://img.icons8.com/?size=100&id=nj0Uj45LGUYh&format=png&color=000000', // İkon/Resim URL
+                link: 'https://instagram.com/decentralize_design', // Yeni sekmede açılacak link
+                label: '', // Altındaki yazı
+                fontFamily: 'Telegrama Raw',
+                fontSize: 80,
+                color: '#FFFFFF',
+                width: 250, // Resmin genişliği
+                position: { x: 1050, y: 1050, z: 0 }, // Konumu
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: .6
+            },
+            {
+                type: 'link',
+                src: 'https://img.icons8.com/?size=100&id=13930&format=png&color=000000', // İkon/Resim URL
+                link: 'https://www.linkedin.com/in/yigit-ozen/', // Yeni sekmede açılacak link
+                label: '', // Altındaki yazı
+                fontFamily: 'Telegrama Raw',
+                fontSize: 80,
+                color: '#FFFFFF',
+                width: 250, // Resmin genişliği
+                position: { x: 600, y: 1050, z: 0 }, // Konumu
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: .6
+            },
+
+{
+                type: 'link',
+                src: 'https://static.wixstatic.com/media/54a996_9b89eadf058a48f4b85663c2ff0be66b~mv2.png', // İkon/Resim URL
+                link: 'virtuallyeverafter.work', // Yeni sekmede açılacak link
+                label: 'virtually\neverafter', // Altındaki yazı
+                fontFamily: 'Telegrama Raw',
+                fontSize: 80,
+                color: '#FFFFFF',
+                width: 250, // Resmin genişliği
+               position: { x: -200, y: -1020, z: 0 }, // Konumu
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: .6
+            },
+
+            {
+                type: 'link',
+                src: 'https://static.wixstatic.com/media/54a996_4e9f8ec5649349a5ac7b21ef80e8272f~mv2.png', // İkon/Resim URL
+                link: 'decentralize.design', // Yeni sekmede açılacak link
+                label: 'virtual\ndesign', // Altındaki yazı
+                fontFamily: 'Telegrama Raw',
+                fontSize: 80,
+                color: '#FFFFFF',
+                width: 250, // Resmin genişliği
+               position: { x: -1050, y: -1020, z: 0 }, // Konumu
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: .6
+            },
+
+{
+                type: 'link',
+                src: 'https://static.wixstatic.com/media/54a996_edfe743a8afb47c2a7c743b9ec288da3~mv2.png', // İkon/Resim URL
+                link: 'de-centralize.com', // Yeni sekmede açılacak link
+                label: 'artworks', // Altındaki yazı
+                fontFamily: 'Telegrama Raw',
+                fontSize: 80,
+                color: '#FFFFFF',
+                width: 250, // Resmin genişliği
+               position: { x: -600, y: -1020, z: 0 }, // Konumu
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: .6
+            },
+            
+            {
+                type: 'link',
+                src: 'https://static.wixstatic.com/media/54a996_0daeaf7be2ce4ba88173c00f5fbabc42~mv2.png', // İkon/Resim URL
+                link: 'neue2dojo.com', // Yeni sekmede açılacak link
+                label: 'neue2dojo\ngallery', // Altındaki yazı
+                fontFamily: 'Telegrama Raw',
+                fontSize: 80,
+                color: '#FFFFFF',
+                width: 250, // Resmin genişliği
+               position: { x: 200, y: -1020, z: 0 }, // Konumu
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: .6
+            },
+            {
+                type: 'link',
+                src: 'https://static.wixstatic.com/media/54a996_5555b50437514963a389e43f199d5e0b~mv2.png', // İkon/Resim URL
+                link: 'theater.decentralize.design', // Yeni sekmede açılacak link
+                label: 'theater', // Altındaki yazı
+                fontFamily: 'Telegrama Raw',
+                fontSize: 80,
+                color: '#FFFFFF',
+                width: 250, // Resmin genişliği
+               position: { x: 600, y: -1020, z: 0 }, // Konumu
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: .6
+            },
+            {
+                type: 'link',
+                src: 'https://static.wixstatic.com/media/54a996_2a90472cf4f549099748772342b3d534~mv2.png', // İkon/Resim URL
+                link: 'blog.decentralize.design', // Yeni sekmede açılacak link
+                label: 'blog', // Altındaki yazı
+                fontFamily: 'Telegrama Raw',
+                fontSize: 80,
+                color: '#FFFFFF',
+                width: 250, // Resmin genişliği
+               position: { x: 1050, y: -1020, z: 0 }, // Konumu
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: .6
+            }
+        ];;
+
+
+
+        // --- 2. SETUP ---
+        let camera, scene, rendererGL, rendererCSS, controls, dragControls;
+        let clock;
+        let raycaster, mouse;
+        const clickableObjects = []; 
+        
+        // ** MOBILE DETECTION **
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // ** LENS SETTING (FRUSTUM) **
+        // Mobilde daha geniş açı (uzaktan bakış) için frustum size'ı artırıyoruz.
+        let frustumSize = isMobile ? 5500 : 3000; 
+        
+        let isClickBlocked = false; 
+
+        // Touch handling variables
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        init();
+        animate();
+
+        function init() {
+            clock = new THREE.Clock();
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            const container = document.getElementById('scene-container');
+            const aspect = window.innerWidth / window.innerHeight;
+            
+            // --- ORTHOGRAPHIC CAMERA SETUP ---
+            camera = new THREE.OrthographicCamera(
+                frustumSize * aspect / - 2,
+                frustumSize * aspect / 2,
+                frustumSize / 2,
+                frustumSize / - 2,
+                1,
+                10000
+            );
+            
+            camera.position.set(0, 0, 1500); 
+            camera.lookAt(0, 0, 0);
+
+            scene = new THREE.Scene();
+
+            // --- RENDERER SETUP ---
+            
+            // 1. CSS3D Renderer (BOTTOM LAYER)
+            rendererCSS = new CSS3DRenderer();
+            rendererCSS.setSize(window.innerWidth, window.innerHeight);
+            rendererCSS.domElement.style.position = 'absolute';
+            rendererCSS.domElement.style.top = '0';
+            rendererCSS.domElement.style.zIndex = '0'; 
+            container.appendChild(rendererCSS.domElement);
+
+            // 2. WebGL Renderer (TOP LAYER)
+            rendererGL = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            rendererGL.setPixelRatio(window.devicePixelRatio);
+            rendererGL.setSize(window.innerWidth, window.innerHeight);
+            rendererGL.domElement.style.position = 'absolute';
+            rendererGL.domElement.style.top = '0';
+            rendererGL.domElement.style.zIndex = '1'; 
+            rendererGL.domElement.style.pointerEvents = 'none'; 
+            rendererGL.toneMapping = THREE.ACESFilmicToneMapping;
+            rendererGL.toneMappingExposure = 1.0;
+            rendererGL.outputColorSpace = THREE.SRGBColorSpace;
+            container.appendChild(rendererGL.domElement);
+
+            // Controls
+            controls = new OrbitControls(camera, document.body);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.enableZoom = true; // Bu özellik mobile pinch-to-zoom'u sağlar
+            controls.zoomSpeed = 1.0;
+
+            // --- DRAG CONTROLS ---
+            // Sadece Masaüstünde (Mobile değilse) Drag özelliğini açıyoruz
+            if (!isMobile) {
+                dragControls = new DragControls(clickableObjects, camera, document.body);
+                
+                dragControls.addEventListener('dragstart', function (event) {
+                    controls.enabled = false;
+                    isClickBlocked = false; 
+                });
+
+                dragControls.addEventListener('drag', function (event) {
+                    isClickBlocked = true; 
+                });
+
+                dragControls.addEventListener('dragend', function (event) {
+                    controls.enabled = true;
+                    if (isClickBlocked) {
+                        setTimeout(() => { isClickBlocked = false; }, 100);
+                    }
+                });
+            }
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
+            dirLight.position.set(1000, 1000, 1000);
+            scene.add(dirLight);
+
+            const pmremGenerator = new THREE.PMREMGenerator(rendererGL);
+            pmremGenerator.compileEquirectangularShader();
+            new RGBELoader().load('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/equirectangular/venice_sunset_1k.hdr', (texture) => {
+                const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+                scene.environment = envMap;
+                texture.dispose();
+                pmremGenerator.dispose();
+            });
+
+            document.fonts.ready.then(function () {
+                buildCuratedScene();
+            });
+
+            window.addEventListener('resize', onWindowResize);
+            
+            // --- EVENT LISTENERS FOR INTERACTION ---
+            
+            // 1. Desktop Click
+            window.addEventListener('click', (event) => {
+                // Drag sonrası tıklamayı engelle (Desktop only logic)
+                if (isClickBlocked) return;
+                
+                // Normal tıklama
+                handleInteraction(event.clientX, event.clientY);
+            }); 
+            
+            // 2. Mobile Tap (Touch) Detection
+            // Touch başlangıcını kaydet
+            window.addEventListener('touchstart', (event) => {
+                if(event.touches.length > 0) {
+                    touchStartX = event.touches[0].clientX;
+                    touchStartY = event.touches[0].clientY;
+                }
+            }, {passive: false});
+
+            // Touch bitişini kontrol et - eğer kaydırma yoksa "Tıklama" say
+            window.addEventListener('touchend', (event) => {
+                if(event.changedTouches.length > 0) {
+                    const touchEndX = event.changedTouches[0].clientX;
+                    const touchEndY = event.changedTouches[0].clientY;
+                    
+                    const dx = touchEndX - touchStartX;
+                    const dy = touchEndY - touchStartY;
+                    
+                    // Hareket çok az ise (örneğin 10 pikselden az), bu bir TIKLAMA (TAP) dır.
+                    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+                        handleInteraction(touchEndX, touchEndY);
+                    }
+                }
+            }, {passive: false});
+            
+            
+            setTimeout(() => { document.getElementById('loader').style.opacity = 0; }, 1000);
+            setTimeout(() => { document.getElementById('loader').style.display = 'none'; }, 1500);
+        }
+
+        // --- UNIFIED INTERACTION HANDLER ---
+        function handleInteraction(clientX, clientY) {
+            // Mouse vektörünü güncelle
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(clickableObjects, true); 
+
+            if (intersects.length > 0) {
+                let object = intersects[0].object;
+                
+                // Parent'a kadar çık
+                while(object.parent && !object.userData.isVideo && !object.userData.isSound && !object.userData.isLink) {
+                    object = object.parent;
+                    if (!object) break; 
+                }
+                if (!object) object = intersects[0].object; 
+
+                // --- VIDEO PLAY/PAUSE ---
+                if (object.userData.isVideo) {
+                    const vid = object.userData.videoEl;
+                    const playBtn = object.userData.playBtn;
+                    
+                    if (vid.paused || vid.ended) {
+                        vid.play(); // Mobile'da kullanıcı etkileşimi (touchend) içinde olduğumuz için çalışır
+                        object.material.map = object.userData.videoTex;
+                        object.userData.isPlaying = true;
+                        playBtn.visible = false;
+                        
+                        vid.onended = () => {
+                            object.userData.isPlaying = false;
+                            playBtn.visible = true;
+                        };
+                    } else {
+                        vid.pause();
+                        object.userData.isPlaying = false;
+                        playBtn.visible = true;
+                    }
+                    object.material.needsUpdate = true;
+                }
+
+                // --- SOUND PLAY/PAUSE ---
+                if (object.userData.isSound) {
+                    const audio = object.userData.audioEl;
+                    if (audio.paused) {
+                        audio.play();
+                        object.userData.isPlaying = true;
+                        new TWEEN.Tween(object.scale).to({x: object.scale.x * 1.1, y: object.scale.y * 1.1}, 100).yoyo(true).repeat(1).start();
+                    } else {
+                        audio.pause();
+                        audio.currentTime = 0; 
+                        object.userData.isPlaying = false;
+                    }
+                }
+
+                // --- LINK CLICK ---
+                if (object.userData.isLink) {
+                    // Animasyon (Hafif bir zıplama)
+                    new TWEEN.Tween(object.scale).to({x: object.scale.x * 0.9, y: object.scale.y * 0.9}, 100).yoyo(true).repeat(1).start();
+                    
+                    // Yeni sekmede aç
+                    setTimeout(() => {
+                        window.open(object.userData.url, '_blank');
+                    }, 150);
+                }
+            }
+        }
+
+        // --- 3. BUILDER ---
+
+        function fixGithubUrl(url) {
+            if (url.includes('github.com') && url.includes('/blob/')) {
+                return url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
+            }
+            return url;
+        }
+
+        function degToRad(degrees) {
+            return degrees * (Math.PI / 180);
+        }
+
+        function createTextTexture(text, fontSize, font, color) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const lines = text.split('\\n').length > 1 ? text.split('\\n') : text.split('\n');
+            const lineHeight = fontSize * 1.1;
+            
+            ctx.font = `${fontSize}px "${font}"`;
+            let maxWidth = 0;
+            lines.forEach(line => {
+                const w = ctx.measureText(line).width;
+                if(w > maxWidth) maxWidth = w;
+            });
+            
+            canvas.width = Math.ceil(maxWidth + 40); 
+            canvas.height = Math.ceil(lines.length * lineHeight + 40);
+            
+            ctx.font = `${fontSize}px "${font}"`;
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            const centerX = canvas.width / 2;
+            let startY = (canvas.height - (lines.length - 1) * lineHeight) / 2;
+            
+            lines.forEach((line, i) => {
+                ctx.fillText(line, centerX, startY + (i * lineHeight));
+            });
+            
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            return { texture: tex, width: canvas.width, height: canvas.height };
+        }
+
+        function createPlayButtonTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.beginPath();
+            ctx.moveTo(35, 25);
+            ctx.lineTo(105, 64);
+            ctx.lineTo(35, 103);
+            ctx.closePath();
+            
+            ctx.fillStyle = '#FF006A';
+            ctx.shadowColor = "rgba(0,0,0,0.5)";
+            ctx.shadowBlur = 10;
+            ctx.fill();
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            return tex;
+        }
+
+        function buildCuratedScene() {
+            const gltfLoader = new GLTFLoader();
+            const dracoLoader = new DRACOLoader();
+            dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
+            gltfLoader.setDRACOLoader(dracoLoader);
+            gltfLoader.setMeshoptDecoder(MeshoptDecoder);
+            const textureLoader = new THREE.TextureLoader();
+
+            sceneObjects.forEach(item => {
+                const applyTransform = (obj3d) => {
+                    if (item.position) obj3d.position.set(item.position.x, item.position.y, item.position.z);
+                    if (item.rotation) obj3d.rotation.set(degToRad(item.rotation.x), degToRad(item.rotation.y), degToRad(item.rotation.z));
+                    if (item.scale) {
+                        if (typeof item.scale === 'number') obj3d.scale.setScalar(item.scale);
+                        else obj3d.scale.set(item.scale.x, item.scale.y, item.scale.z);
+                    }
+                };
+
+                const safeSrc = item.src ? fixGithubUrl(item.src) : '';
+
+                // --- VIDEO ---
+                if (item.type === 'video') {
+                    const video = document.createElement('video');
+                    video.src = safeSrc;
+                    video.crossOrigin = "anonymous";
+                    video.loop = false;
+                    video.muted = false;
+                    video.playsInline = true;
+                    video.style.display = 'none'; 
+                    document.body.appendChild(video);
+
+                    const thumbUrl = item.poster ? fixGithubUrl(item.poster) : 'https://placehold.co/1024x576/000/FFF?text=PLAY';
+                    const posterTexture = textureLoader.load(thumbUrl);
+                    posterTexture.colorSpace = THREE.SRGBColorSpace;
+
+                    const videoTexture = new THREE.VideoTexture(video);
+                    videoTexture.colorSpace = THREE.SRGBColorSpace;
+
+                    const geometry = new THREE.PlaneGeometry(item.width, item.height);
+                    const material = new THREE.MeshBasicMaterial({ map: posterTexture, side: THREE.DoubleSide, transparent: false });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    
+                    const playTex = createPlayButtonTexture();
+                    const playGeo = new THREE.PlaneGeometry(200, 200); 
+                    const playMat = new THREE.MeshBasicMaterial({ map: playTex, transparent: true, side: THREE.DoubleSide, depthTest: false });
+                    const playMesh = new THREE.Mesh(playGeo, playMat);
+                    playMesh.position.z = 5; 
+                    playMesh.renderOrder = 1; 
+                    
+                    // Önemli: Play butonuna isim verelim ki raycaster ile bulabilelim
+                    playMesh.name = "PlayButton";
+                    
+                    mesh.add(playMesh); 
+
+                    applyTransform(mesh);
+                    
+                    mesh.userData = { 
+                        isVideo: true, 
+                        videoEl: video, 
+                        videoTex: videoTexture,
+                        posterTex: posterTexture,
+                        isPlaying: false,
+                        playBtn: playMesh
+                    };
+                    
+                    scene.add(mesh);
+                    clickableObjects.push(mesh);
+                }
+
+                // --- HTML (IFRAME) ---
+                else if (item.type === 'html') {
+                    const div = document.createElement('div');
+                    div.className = 'scene-html-element';
+                    div.style.width = (item.width || 800) + 'px';
+                    div.style.height = (item.height || 600) + 'px';
+                    
+                    const iframe = document.createElement('iframe');
+                    iframe.className = 'scene-iframe';
+                    iframe.src = safeSrc;
+                    div.appendChild(iframe);
+
+                    const cssObj = new CSS3DObject(div);
+                    applyTransform(cssObj);
+                    scene.add(cssObj);
+                }
+
+                // --- SOUND ---
+                else if (item.type === 'sound') {
+                    const audio = new Audio(safeSrc);
+                    // Load Speaker PNG
+                    const speakerTex = textureLoader.load('https://raw.githubusercontent.com/decentralize-dfw/decentralize-archives/main/speaker.png');
+                    speakerTex.colorSpace = THREE.SRGBColorSpace;
+
+                    const size = 200; 
+                    const geometry = new THREE.PlaneGeometry(size, size);
+                    const material = new THREE.MeshBasicMaterial({ 
+                        map: speakerTex, 
+                        transparent: true, 
+                        side: THREE.DoubleSide 
+                    });
+                    const mesh = new THREE.Mesh(geometry, material);
+                    
+                    applyTransform(mesh);
+
+                    // Add Label (Text Mesh) as Child
+                    if (item.label) {
+                        const { texture, width, height } = createTextTexture(item.label, 40, item.fontFamily || 'sans-serif', item.color || '#fff');
+                        const labelGeo = new THREE.PlaneGeometry(width, height);
+                        const labelMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
+                        const labelMesh = new THREE.Mesh(labelGeo, labelMat);
+                        // Position above the speaker
+                        labelMesh.position.y = size / 2 + height / 2 + 10; 
+                        mesh.add(labelMesh);
+                    }
+
+                    mesh.userData = {
+                        isSound: true,
+                        audioEl: audio,
+                        isPlaying: false
+                    };
+
+                    scene.add(mesh);
+                    clickableObjects.push(mesh);
+                }
+
+                // --- IMAGE ---
+                else if (item.type === 'image') {
+                    const texture = textureLoader.load(safeSrc);
+                    texture.colorSpace = THREE.SRGBColorSpace;
+                    
+                    const geometry = new THREE.PlaneGeometry(1, 1); 
+                    const material = new THREE.MeshBasicMaterial({ 
+                        map: texture, 
+                        side: THREE.DoubleSide, 
+                        transparent: true,
+                        alphaTest: 0.5 
+                    });
+                    
+                    const mesh = new THREE.Mesh(geometry, material);
+                    applyTransform(mesh);
+                    
+                    if (item.width) {
+                        mesh.scale.set(item.width, item.width, 1); 
+                        texture.onload = () => {
+                            const aspect = texture.image.width / texture.image.height;
+                            mesh.scale.set(item.width, item.width / aspect, 1);
+                        }
+                    }
+
+                    scene.add(mesh);
+                    clickableObjects.push(mesh); // Add images to draggable list
+                }
+
+                // --- TEXT (WEBGL) ---
+                else if (item.type === 'text') {
+                    const { texture, width, height } = createTextTexture(item.content, item.fontSize, item.fontFamily, item.color);
+                    
+                    const geometry = new THREE.PlaneGeometry(width, height);
+                    const material = new THREE.MeshBasicMaterial({ 
+                        map: texture, 
+                        transparent: true, 
+                        side: THREE.DoubleSide,
+                        alphaTest: 0.1 
+                    });
+                    
+                    const mesh = new THREE.Mesh(geometry, material);
+                    applyTransform(mesh);
+                    
+                    scene.add(mesh);
+                    clickableObjects.push(mesh); // Add text to draggable list
+                }
+
+                // --- MODEL ---
+                else if (item.type === 'model') {
+                    gltfLoader.load(safeSrc, (gltf) => {
+                        const model = gltf.scene;
+                        applyTransform(model);
+                        scene.add(model);
+                        clickableObjects.push(model); // Add model to draggable list
+                        
+                        if (gltf.animations && gltf.animations.length > 0) {
+                            const mixer = new THREE.AnimationMixer(model);
+                            gltf.animations.forEach(clip => mixer.clipAction(clip).play());
+                            if (!window.mixers) window.mixers = [];
+                            window.mixers.push(mixer);
+                        }
+                    }, undefined, (err) => console.error(err));
+                }
+
+                // --- LINK OBJECT (NEW) ---
+                else if (item.type === 'link') {
+                    const group = new THREE.Group();
+                    applyTransform(group);
+                    
+                    // 1. Resim (Image)
+                    const texture = textureLoader.load(safeSrc);
+                    texture.colorSpace = THREE.SRGBColorSpace;
+                    
+                    const imgWidth = item.width || 200;
+                    const imgGeo = new THREE.PlaneGeometry(imgWidth, imgWidth); 
+                    const imgMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
+                    const imgMesh = new THREE.Mesh(imgGeo, imgMat);
+                    
+                    // Aspect ratio koruma
+                    texture.onload = () => {
+                        const aspect = texture.image.width / texture.image.height;
+                        imgMesh.scale.set(1, 1/aspect, 1); 
+                    };
+
+                    group.add(imgMesh);
+
+                    // 2. Etiket (Label)
+                    if (item.label) {
+                        const { texture: textTex, width: textW, height: textH } = createTextTexture(
+                            item.label, 
+                            item.fontSize || 40, 
+                            item.fontFamily || 'sans-serif', 
+                            item.color || '#fff'
+                        );
+                        
+                        const labelGeo = new THREE.PlaneGeometry(textW, textH);
+                        const labelMat = new THREE.MeshBasicMaterial({ map: textTex, transparent: true, side: THREE.DoubleSide });
+                        const labelMesh = new THREE.Mesh(labelGeo, labelMat);
+                        
+                        // Konum: Resmin altına
+                        labelMesh.position.y = - (imgWidth / 2 + 50); 
+                        
+                        group.add(labelMesh);
+                    }
+
+                    group.userData = {
+                        isLink: true,
+                        url: item.link
+                    };
+
+                    scene.add(group);
+                    clickableObjects.push(group); 
+                }
+            });
+        }
+
+        // --- RENDER LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+            TWEEN.update();
+            
+            if (clock) {
+                const delta = clock.getDelta();
+                if (window.mixers) {
+                    window.mixers.forEach(mixer => mixer.update(delta));
+                }
+            }
+
+            if (controls) controls.update();
+            
+            rendererGL.render(scene, camera);
+            rendererCSS.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            const aspect = window.innerWidth / window.innerHeight;
+            
+            // Re-calculate frustum on resize (handles mobile orientation change)
+            let currentFrustum = frustumSize;
+            if (isMobile && window.innerWidth < window.innerHeight) {
+                 // Portrait mode on mobile might need even more zoom out
+                 currentFrustum = 6000;
+            } else if (isMobile) {
+                 currentFrustum = 5500;
+            } else {
+                 currentFrustum = 3000;
+            }
+
+            camera.left = - currentFrustum * aspect / 2;
+            camera.right = currentFrustum * aspect / 2;
+            camera.top = currentFrustum / 2;
+            camera.bottom = - currentFrustum / 2;
+            
+            camera.updateProjectionMatrix();
+            rendererGL.setSize(window.innerWidth, window.innerHeight);
+            rendererCSS.setSize(window.innerWidth, window.innerHeight);
+        }
+
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script> 
+</body>
+</html>
